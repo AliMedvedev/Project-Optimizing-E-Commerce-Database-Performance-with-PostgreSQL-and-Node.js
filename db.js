@@ -16,5 +16,4 @@ pool.connect((err) => {
         console.log('Connected to ShopEase PostgreSQL database!');
     }
 });
-
 module.exports = pool;
