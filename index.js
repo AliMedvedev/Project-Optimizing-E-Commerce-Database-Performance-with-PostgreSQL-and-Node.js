@@ -16,7 +16,7 @@ const swaggerOptions = {
             version: '1.0.0',
             description: 'E-Commerce Database API for ShopEase Kenya',
         },
-        servers: [{ url: 'http://localhost:3000' }],
+        servers: [{ url: `http://localhost:${process.env.PORT || 3000}` }],
     },
     apis: ['./index.js'],
 };
@@ -26,20 +26,64 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 /**
  * @swagger
- * /products:
+ * /:
  *   get:
- *     summary: Get all products
+ *     summary: Health check
  *     responses:
  *       200:
- *         description: List of all products
+ *         description: API is running
+ */
+app.get('/', (req, res) => {
+    res.json({ message: 'ShopEase API is running' });
+});
+
+/**
+ * @swagger
+ * /products:
+ *   get:
+ *     summary: Get products with optional limit
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Number of products to return (default 50, max 200)
+ *     responses:
+ *       200:
+ *         description: List of products
  */
 app.get('/products', async (req, res) => {
     try {
+        let limit = parseInt(req.query.limit, 10) || 50;
+
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+
         const result = await pool.query(
-            'SELECT * FROM products ORDER BY product_id'
+            `SELECT 
+                product_id,
+                product_category_name,
+                product_name_length,
+                product_description_length,
+                product_photos_qty,
+                product_weight_g,
+                product_length_cm,
+                product_height_cm,
+                product_width_cm
+             FROM products
+             ORDER BY product_id
+             LIMIT $1`,
+            [limit]
         );
-        res.json(result.rows);
+
+        res.json({
+            count: result.rows.length,
+            limit,
+            data: result.rows,
+        });
     } catch (err) {
+        console.error('GET /products error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -48,13 +92,14 @@ app.get('/products', async (req, res) => {
  * @swagger
  * /products/{id}:
  *   get:
- *     summary: Get a product by ID
+ *     summary: Get a product by product_id
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
+ *         description: Product ID from the products table
  *     responses:
  *       200:
  *         description: Product found
@@ -64,14 +109,30 @@ app.get('/products', async (req, res) => {
 app.get('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
+
         const result = await pool.query(
-            'SELECT * FROM products WHERE product_id = $1', [id]
+            `SELECT 
+                product_id,
+                product_category_name,
+                product_name_length,
+                product_description_length,
+                product_photos_qty,
+                product_weight_g,
+                product_length_cm,
+                product_height_cm,
+                product_width_cm
+             FROM products
+             WHERE product_id = $1`,
+            [id]
         );
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
         }
+
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('GET /products/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -87,33 +148,81 @@ app.get('/products/:id', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - product_id
  *             properties:
- *               name:
+ *               product_id:
  *                 type: string
- *               description:
+ *               product_category_name:
  *                 type: string
- *               price:
- *                 type: number
- *               stock_quantity:
+ *               product_name_length:
  *                 type: integer
- *               category:
- *                 type: string
+ *               product_description_length:
+ *                 type: integer
+ *               product_photos_qty:
+ *                 type: integer
+ *               product_weight_g:
+ *                 type: integer
+ *               product_length_cm:
+ *                 type: integer
+ *               product_height_cm:
+ *                 type: integer
+ *               product_width_cm:
+ *                 type: integer
  *     responses:
  *       201:
  *         description: Product created
+ *       400:
+ *         description: product_id is required
  */
 app.post('/products', async (req, res) => {
     try {
-        const { name, description, price, stock_quantity, category } = req.body;
+        const {
+            product_id,
+            product_category_name,
+            product_name_length,
+            product_description_length,
+            product_photos_qty,
+            product_weight_g,
+            product_length_cm,
+            product_height_cm,
+            product_width_cm,
+        } = req.body;
+
+        if (!product_id) {
+            return res.status(400).json({ error: 'product_id is required' });
+        }
+
         const result = await pool.query(
-            `INSERT INTO products 
-            (name, description, price, stock_quantity, category) 
-            VALUES ($1, $2, $3, $4, $5) 
+            `INSERT INTO products (
+                product_id,
+                product_category_name,
+                product_name_length,
+                product_description_length,
+                product_photos_qty,
+                product_weight_g,
+                product_length_cm,
+                product_height_cm,
+                product_width_cm
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *`,
-            [name, description, price, stock_quantity, category]
+            [
+                product_id,
+                product_category_name || null,
+                product_name_length ?? null,
+                product_description_length ?? null,
+                product_photos_qty ?? null,
+                product_weight_g ?? null,
+                product_length_cm ?? null,
+                product_height_cm ?? null,
+                product_width_cm ?? null,
+            ]
         );
+
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        console.error('POST /products error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -128,7 +237,8 @@ app.post('/products', async (req, res) => {
  *         name: id
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
+ *         description: Product ID
  *     requestBody:
  *       required: true
  *       content:
@@ -136,16 +246,22 @@ app.post('/products', async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               product_category_name:
  *                 type: string
- *               description:
- *                 type: string
- *               price:
- *                 type: number
- *               stock_quantity:
+ *               product_name_length:
  *                 type: integer
- *               category:
- *                 type: string
+ *               product_description_length:
+ *                 type: integer
+ *               product_photos_qty:
+ *                 type: integer
+ *               product_weight_g:
+ *                 type: integer
+ *               product_length_cm:
+ *                 type: integer
+ *               product_height_cm:
+ *                 type: integer
+ *               product_width_cm:
+ *                 type: integer
  *     responses:
  *       200:
  *         description: Product updated
@@ -155,20 +271,50 @@ app.post('/products', async (req, res) => {
 app.put('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, stock_quantity, category } = req.body;
+        const {
+            product_category_name,
+            product_name_length,
+            product_description_length,
+            product_photos_qty,
+            product_weight_g,
+            product_length_cm,
+            product_height_cm,
+            product_width_cm,
+        } = req.body;
+
         const result = await pool.query(
-            `UPDATE products SET 
-            name=$1, description=$2, price=$3, 
-            stock_quantity=$4, category=$5 
-            WHERE product_id=$6 
-            RETURNING *`,
-            [name, description, price, stock_quantity, category, id]
+            `UPDATE products
+             SET
+                product_category_name = $1,
+                product_name_length = $2,
+                product_description_length = $3,
+                product_photos_qty = $4,
+                product_weight_g = $5,
+                product_length_cm = $6,
+                product_height_cm = $7,
+                product_width_cm = $8
+             WHERE product_id = $9
+             RETURNING *`,
+            [
+                product_category_name || null,
+                product_name_length ?? null,
+                product_description_length ?? null,
+                product_photos_qty ?? null,
+                product_weight_g ?? null,
+                product_length_cm ?? null,
+                product_height_cm ?? null,
+                product_width_cm ?? null,
+                id,
+            ]
         );
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
         }
+
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('PUT /products/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -183,7 +329,8 @@ app.put('/products/:id', async (req, res) => {
  *         name: id
  *         required: true
  *         schema:
- *           type: integer
+ *           type: string
+ *         description: Product ID
  *     responses:
  *       200:
  *         description: Product deleted
@@ -193,298 +340,37 @@ app.put('/products/:id', async (req, res) => {
 app.delete('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
+
         const result = await pool.query(
-            'DELETE FROM products WHERE product_id = $1 RETURNING *', [id]
+            'DELETE FROM products WHERE product_id = $1 RETURNING *',
+            [id]
         );
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Product not found' });
         }
-        res.json({ message: 'Product deleted successfully', product: result.rows[0] });
+
+        res.json({
+            message: 'Product deleted successfully',
+            product: result.rows[0],
+        });
     } catch (err) {
+        console.error('DELETE /products/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-
-// =============================================
-// PAYMENTS ENDPOINTS
-// =============================================
-
-/**
- * @swagger
- * /payments:
- *   get:
- *     summary: Get all payments
- *     responses:
- *       200:
- *         description: List of all payments
- */
-app.get('/payments', async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT p.payment_id, p.order_id, p.payment_method, 
-             p.payment_status, p.amount, p.transaction_code, 
-             p.payment_date
-             FROM payments p
-             ORDER BY p.payment_date DESC
-             LIMIT 100`
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /payments/{id}:
- *   get:
- *     summary: Get payment by order ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Payment found
- *       404:
- *         description: Payment not found
- */
-app.get('/payments/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query(
-            'SELECT * FROM payments WHERE order_id = $1', [id]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Payment not found' });
-        }
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// =============================================
-// DELIVERIES ENDPOINTS
-// =============================================
-
-/**
- * @swagger
- * /deliveries:
- *   get:
- *     summary: Get all deliveries
- *     responses:
- *       200:
- *         description: List of all deliveries
- */
-app.get('/deliveries', async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT * FROM deliveries
-             ORDER BY created_at DESC
-             LIMIT 100`
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /deliveries/{id}:
- *   get:
- *     summary: Get delivery by order ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Delivery found
- *       404:
- *         description: Delivery not found
- */
-app.get('/deliveries/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await pool.query(
-            'SELECT * FROM deliveries WHERE order_id = $1', [id]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Delivery not found' });
-        }
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /deliveries/{id}/status:
- *   put:
- *     summary: Update delivery status
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               delivery_status:
- *                 type: string
- *     responses:
- *       200:
- *         description: Delivery status updated
- */
-app.put('/deliveries/:id/status', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { delivery_status } = req.body;
-        const result = await pool.query(
-            `UPDATE deliveries SET delivery_status = $1
-             WHERE order_id = $2 RETURNING *`,
-            [delivery_status, id]
-        );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Delivery not found' });
-        }
-        res.json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// =============================================
-// RETURNS ENDPOINTS
-// =============================================
-
-/**
- * @swagger
- * /returns:
- *   get:
- *     summary: Get all returns
- *     responses:
- *       200:
- *         description: List of all returns
- */
-app.get('/returns', async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT r.return_id, r.order_id, 
-             c.first_name, c.last_name,
-             r.reason, r.return_status, 
-             r.refund_amount, r.return_date
-             FROM returns r
-             JOIN customers c ON r.customer_id = c.customer_id
-             ORDER BY r.return_date DESC`
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * @swagger
- * /returns:
- *   post:
- *     summary: Create a new return request
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               order_id:
- *                 type: integer
- *               customer_id:
- *                 type: integer
- *               reason:
- *                 type: string
- *               refund_amount:
- *                 type: number
- *     responses:
- *       201:
- *         description: Return request created
- */
-app.post('/returns', async (req, res) => {
-    try {
-        const { order_id, customer_id, reason, refund_amount } = req.body;
-        const result = await pool.query(
-            `INSERT INTO returns (order_id, customer_id, reason, refund_amount)
-             VALUES ($1, $2, $3, $4) RETURNING *`,
-            [order_id, customer_id, reason, refund_amount]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// =============================================
-// SUPPLIERS ENDPOINTS
-// =============================================
-
-/**
- * @swagger
- * /suppliers:
- *   get:
- *     summary: Get all suppliers
- *     responses:
- *       200:
- *         description: List of all suppliers
- */
-app.get('/suppliers', async (req, res) => {
-    try {
-        const result = await pool.query(
-            'SELECT * FROM suppliers ORDER BY name'
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// =============================================
-// CATEGORIES ENDPOINTS
-// =============================================
-
-/**
- * @swagger
- * /categories:
- *   get:
- *     summary: Get all categories
- *     responses:
- *       200:
- *         description: List of all categories
- */
-app.get('/categories', async (req, res) => {
-    try {
-        const result = await pool.query(
-            'SELECT * FROM categories ORDER BY name'
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+
+app.listen(PORT, async () => {
     console.log(`ShopEase server running on http://localhost:${PORT}`);
     console.log(`Swagger docs at http://localhost:${PORT}/api-docs`);
+
+    try {
+        await pool.query('SELECT 1');
+        console.log('Connected to ShopEase PostgreSQL database!');
+    } catch (err) {
+        console.error('Database connection error:', err.message);
+    }
 });
