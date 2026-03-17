@@ -1,4 +1,4 @@
-const express = require('express');
+code = """const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config();
@@ -258,5 +258,17 @@ app.listen(PORT, () => {
     console.log(`ShopEase server running on http://localhost:${PORT}`);
     console.log(`Swagger docs at http://localhost:${PORT}/api-docs`);
 });
+"""
 
+with open('index.js', 'w') as f:
+    f.write(code)
+print('index.js updated successfully!')
+```
 
+Press **Ctrl + S** then **close Notepad**!
+
+---
+
+## Step 2 — Run the Python file:
+```
+python write_index.py
