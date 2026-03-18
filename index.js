@@ -15,7 +15,7 @@ const swaggerOptions = {
             version: '1.0.0',
             description: 'E-Commerce API - Real Olist Dataset 451,464 Records',
         },
-        servers: [{ url: 'http://localhost:3000' }],
+        servers: [{ url: `http://localhost:${process.env.PORT || 3000}` }],
     },
     apis: ['./index.js'],
 };
@@ -25,18 +25,45 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 /**
  * @swagger
+ * /:
+ *   get:
+ *     summary: Health check
+ *     responses:
+ *       200:
+ *         description: API is running
+ */
+app.get('/', (req, res) => {
+    res.json({ message: 'ShopEase API is running - Real Olist Dataset 451,464 Records' });
+});
+
+/**
+ * @swagger
  * /products:
  *   get:
- *     summary: Get all products
+ *     summary: Get all products (Real Olist Data)
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Number of products to return (default 50, max 200)
  *     responses:
  *       200:
  *         description: List of products
  */
 app.get('/products', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM olist_products LIMIT 100');
-        res.json(result.rows);
+        let limit = parseInt(req.query.limit, 10) || 50;
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+        const result = await pool.query(
+            'SELECT * FROM olist_products ORDER BY product_id LIMIT $1',
+            [limit]
+        );
+        res.json({ count: result.rows.length, limit, data: result.rows });
     } catch (err) {
+        console.error('GET /products error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -52,6 +79,7 @@ app.get('/products', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *         description: Product ID from the olist_products table
  *     responses:
  *       200:
  *         description: Product found
@@ -61,10 +89,13 @@ app.get('/products', async (req, res) => {
 app.get('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM olist_products WHERE product_id = $1', [id]);
+        const result = await pool.query(
+            'SELECT * FROM olist_products WHERE product_id = $1', [id]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('GET /products/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -73,16 +104,29 @@ app.get('/products/:id', async (req, res) => {
  * @swagger
  * /customers:
  *   get:
- *     summary: Get all customers
+ *     summary: Get all customers (Real Olist Data)
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Number of customers to return (default 50, max 200)
  *     responses:
  *       200:
  *         description: List of customers
  */
 app.get('/customers', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM olist_customers LIMIT 100');
-        res.json(result.rows);
+        let limit = parseInt(req.query.limit, 10) || 50;
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+        const result = await pool.query(
+            'SELECT * FROM olist_customers LIMIT $1', [limit]
+        );
+        res.json({ count: result.rows.length, limit, data: result.rows });
     } catch (err) {
+        console.error('GET /customers error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -107,10 +151,13 @@ app.get('/customers', async (req, res) => {
 app.get('/customers/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM olist_customers WHERE customer_id = $1', [id]);
+        const result = await pool.query(
+            'SELECT * FROM olist_customers WHERE customer_id = $1', [id]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('GET /customers/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -119,16 +166,29 @@ app.get('/customers/:id', async (req, res) => {
  * @swagger
  * /orders:
  *   get:
- *     summary: Get all orders
+ *     summary: Get all orders (Real Olist Data)
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Number of orders to return (default 50, max 200)
  *     responses:
  *       200:
  *         description: List of orders
  */
 app.get('/orders', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM olist_orders LIMIT 100');
-        res.json(result.rows);
+        let limit = parseInt(req.query.limit, 10) || 50;
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+        const result = await pool.query(
+            'SELECT * FROM olist_orders LIMIT $1', [limit]
+        );
+        res.json({ count: result.rows.length, limit, data: result.rows });
     } catch (err) {
+        console.error('GET /orders error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -153,10 +213,13 @@ app.get('/orders', async (req, res) => {
 app.get('/orders/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM olist_orders WHERE order_id = $1', [id]);
+        const result = await pool.query(
+            'SELECT * FROM olist_orders WHERE order_id = $1', [id]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('GET /orders/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -165,16 +228,29 @@ app.get('/orders/:id', async (req, res) => {
  * @swagger
  * /payments:
  *   get:
- *     summary: Get all payments
+ *     summary: Get all payments (Real Olist Data)
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Number of payments to return (default 50, max 200)
  *     responses:
  *       200:
  *         description: List of payments
  */
 app.get('/payments', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM olist_payments LIMIT 100');
-        res.json(result.rows);
+        let limit = parseInt(req.query.limit, 10) || 50;
+        if (limit < 1) limit = 1;
+        if (limit > 200) limit = 200;
+        const result = await pool.query(
+            'SELECT * FROM olist_payments LIMIT $1', [limit]
+        );
+        res.json({ count: result.rows.length, limit, data: result.rows });
     } catch (err) {
+        console.error('GET /payments error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -199,10 +275,13 @@ app.get('/payments', async (req, res) => {
 app.get('/payments/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM olist_payments WHERE order_id = $1', [id]);
+        const result = await pool.query(
+            'SELECT * FROM olist_payments WHERE order_id = $1', [id]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Payment not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('GET /payments/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -211,7 +290,7 @@ app.get('/payments/:id', async (req, res) => {
  * @swagger
  * /sellers:
  *   get:
- *     summary: Get all sellers
+ *     summary: Get all sellers (Real Olist Data)
  *     responses:
  *       200:
  *         description: List of sellers
@@ -221,6 +300,7 @@ app.get('/sellers', async (req, res) => {
         const result = await pool.query('SELECT * FROM olist_sellers LIMIT 100');
         res.json(result.rows);
     } catch (err) {
+        console.error('GET /sellers error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -245,18 +325,26 @@ app.get('/sellers', async (req, res) => {
 app.get('/order-items/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM olist_order_items WHERE order_id = $1', [id]);
+        const result = await pool.query(
+            'SELECT * FROM olist_order_items WHERE order_id = $1', [id]
+        );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Order items not found' });
         res.json(result.rows);
     } catch (err) {
+        console.error('GET /order-items/:id error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`ShopEase server running on http://localhost:${PORT}`);
     console.log(`Swagger docs at http://localhost:${PORT}/api-docs`);
+    try {
+        await pool.query('SELECT 1');
+        console.log('Connected to ShopEase PostgreSQL database!');
+    } catch (err) {
+        console.error('Database connection error:', err.message);
+    }
 });
-
-
