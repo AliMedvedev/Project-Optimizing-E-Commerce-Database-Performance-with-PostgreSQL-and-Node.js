@@ -4,8 +4,10 @@ const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config();
 const pool = require('./db');
 
+
 const app = express();
 app.use(express.json());
+
 
 const swaggerOptions = {
     definition: {
